@@ -1,14 +1,19 @@
-// DANIELA: pantalla de registro de usuario
-
 import 'package:flutter/material.dart';
 import 'package:reto_habitos/services/auth_service.dart';
 
-class RegisterScreen extends StatelessWidget {
-  RegisterScreen({super.key});
+class RegisterScreen extends StatefulWidget {
+  const RegisterScreen({super.key});
 
+  @override
+  State<RegisterScreen> createState() => _RegisterScreenState();
+}
+
+class _RegisterScreenState extends State<RegisterScreen> {
   final TextEditingController email = TextEditingController();
   final TextEditingController password = TextEditingController();
   final AuthService authService = AuthService();
+
+  bool cargando = false;
 
   @override
   Widget build(BuildContext context) {
@@ -28,33 +33,51 @@ class RegisterScreen extends StatelessWidget {
               decoration: const InputDecoration(labelText: 'Contrasena'),
             ),
             const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: () async {
-                if (email.text.trim().isEmpty ||
-                    password.text.trim().isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Completa todos los campos'),
-                    ),
-                  );
-                  return;
-                }
+            cargando
+                ? const CircularProgressIndicator()
+                : ElevatedButton(
+                    onPressed: () async {
+                      if (email.text.trim().isEmpty ||
+                          password.text.trim().isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Completa todos los campos'),
+                          ),
+                        );
+                        return;
+                      }
 
-                await authService.registrar(
-                  email.text.trim(),
-                  password.text.trim(),
-                );
+                      setState(() => cargando = true);
 
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Usuario registrado, inicia sesion'),
+                      final user = await authService.registrar(
+                        email.text.trim(),
+                        password.text.trim(),
+                      );
+
+                      setState(() => cargando = false);
+
+                      if (user != null) {
+                      
+                        if (!context.mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Usuario registrado, inicia sesion'),
+                          ),
+                        );
+                        Navigator.pushReplacementNamed(context, '/login');
+                      } else {
+                       
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Error al registrar, revisa el correo o la contrasena',
+                            ),
+                          ),
+                        );
+                      }
+                    },
+                    child: const Text('Registrar'),
                   ),
-                );
-
-                Navigator.pushNamed(context, '/login');
-              },
-              child: const Text('Registrar'),
-            ),
           ],
         ),
       ),

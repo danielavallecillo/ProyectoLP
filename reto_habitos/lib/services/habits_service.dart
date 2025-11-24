@@ -1,5 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../models/habit_model.dart';
+import 'package:reto_habitos/models/habit_model.dart';
 
 class HabitsService {
   final FirebaseFirestore db = FirebaseFirestore.instance;
@@ -10,6 +10,7 @@ class HabitsService {
         .collection('users')
         .doc(userId)
         .collection('habits')
+        .orderBy('nombre')
         .snapshots()
         .map(
           (snap) => snap.docs
@@ -32,7 +33,7 @@ class HabitsService {
         .add(habit.toMap());
   }
 
-  // Actualizar un habito
+  // Actualizar un habito existente
   Future<void> actualizarHabit(String userId, HabitModel habit) async {
     await db
         .collection('users')

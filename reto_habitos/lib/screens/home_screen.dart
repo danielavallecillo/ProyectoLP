@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
-import '../models/habit_model.dart';
-import '../services/habits_service.dart';
-import 'add_habit_screen.dart';
+import 'package:reto_habitos/models/habit_model.dart';
+import 'package:reto_habitos/services/habits_service.dart';
+import 'package:reto_habitos/screens/add_habit_screen.dart';
+import 'package:reto_habitos/services/auth_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -14,92 +15,98 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final HabitsService habitsService = HabitsService();
-  String userId = '';
+  final FirebaseAuth auth = FirebaseAuth.instance;
+  final AuthService authService = AuthService();
+
+  String? userId;
 
   @override
   void initState() {
     super.initState();
-    final user = FirebaseAuth.instance.currentUser;
-    userId = user?.uid ?? '';
+    userId = auth.currentUser?.uid;
   }
 
   @override
   Widget build(BuildContext context) {
+    if (userId == null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Reto Habitos')),
+        body: const Center(
+          child: Text('No hay usuario autenticado'),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Lista de habitos'),
+        title: const Text('Mis habitos'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: () async {
+              await authService.logout();
+              if (!mounted) return;
+              Navigator.pushReplacementNamed(context, '/login');
+            },
+          ),
+        ],
       ),
-      body: userId.isEmpty
-          ? const Center(
-              child: Text('No hay usuario autenticado'),
-            )
-          : StreamBuilder<List<HabitModel>>(
-              stream: habitsService.obtenerHabitos(userId),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(
-                    child: CircularProgressIndicator(),
-                  );
-                }
+      body: StreamBuilder<List<HabitModel>>(
+        stream: habitsService.obtenerHabitos(userId!),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
 
-                if (snapshot.hasError) {
-                  return Center(
-                    child: Text('Error: ${snapshot.error}'),
-                  );
-                }
+          if (snapshot.hasError) {
+            return Center(
+              child: Text('Error: ${snapshot.error}'),
+            );
+          }
 
-                final habits = snapshot.data ?? [];
+          final habitos = snapshot.data ?? [];
 
-                if (habits.isEmpty) {
-                  return const Center(
-                    child: Text('Aun no tienes habitos'),
-                  );
-                }
+          if (habitos.isEmpty) {
+            return const Center(
+              child: Text('Todavia no tienes habitos, agrega uno.'),
+            );
+          }
 
-                return ListView.builder(
-                  itemCount: habits.length,
-                  itemBuilder: (context, index) {
-                    final habit = habits[index];
+          return ListView.builder(
+            itemCount: habitos.length,
+            itemBuilder: (context, index) {
+              final habit = habitos[index];
 
-                    return Card(
-                      child: ListTile(
-                        title: Text(habit.nombre),
-                        subtitle: Text(
-                          '${habit.descripcion}\nMinutos por dia: ${habit.minutosPorDia}',
-                        ),
-                        isThreeLine: true,
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(
-                              icon: const Icon(Icons.edit),
-                              onPressed: () {
-                                
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => const AddHabitScreen(),
-                                  ),
-                                );
-                              },
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.delete),
-                              onPressed: () async {
-                                await habitsService.eliminarHabit(
-                                  userId,
-                                  habit.id,
-                                );
-                              },
-                            ),
-                          ],
-                        ),
+              return Card(
+                margin:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                child: ListTile(
+                  title: Text(habit.nombre),
+                  subtitle: Text(
+                    '${habit.descripcion}\nMinutos por dia: ${habit.minutosPorDia}',
+                  ),
+                  isThreeLine: true,
+                  onTap: () {
+                    
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => AddHabitScreen(habit: habit),
                       ),
                     );
                   },
-                );
-              },
-            ),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.delete),
+                    onPressed: () {
+                      _confirmarEliminarHabit(habit);
+                    },
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
           Navigator.push(
@@ -112,5 +119,33 @@ class _HomeScreenState extends State<HomeScreen> {
         child: const Icon(Icons.add),
       ),
     );
+  }
+
+  void _confirmarEliminarHabit(HabitModel habit) async {
+    final confirmar = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Eliminar habito'),
+          content: Text(
+            'Seguro que deseas eliminar el habito "${habit.nombre}"?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancelar'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Eliminar'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmar == true && userId != null) {
+      await habitsService.eliminarHabit(userId!, habit.id);
+    }
   }
 }

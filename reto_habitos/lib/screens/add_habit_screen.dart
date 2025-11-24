@@ -1,140 +1,121 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../models/habit_model.dart';
-import '../services/habits_service.dart';
+
+import 'package:reto_habitos/models/habit_model.dart';
+import 'package:reto_habitos/services/habits_service.dart';
 
 class AddHabitScreen extends StatefulWidget {
-  final HabitModel? habitExistente;
+  final HabitModel? habit;
 
-  const AddHabitScreen({super.key, this.habitExistente});
+  const AddHabitScreen({super.key, this.habit});
 
   @override
   State<AddHabitScreen> createState() => _AddHabitScreenState();
 }
 
 class _AddHabitScreenState extends State<AddHabitScreen> {
-  final _formKey = GlobalKey<FormState>();
   final TextEditingController nombreController = TextEditingController();
   final TextEditingController descripcionController = TextEditingController();
   final TextEditingController minutosController = TextEditingController();
 
   final HabitsService habitsService = HabitsService();
-  final User? user = FirebaseAuth.instance.currentUser;
+  final FirebaseAuth auth = FirebaseAuth.instance;
+
+  bool cargando = false;
 
   @override
   void initState() {
     super.initState();
-    if (widget.habitExistente != null) {
-      nombreController.text = widget.habitExistente!.nombre;
-      descripcionController.text = widget.habitExistente!.descripcion;
-      minutosController.text =
-          widget.habitExistente!.minutosPorDia.toString();
-    }
-  }
-
-  @override
-  void dispose() {
-    nombreController.dispose();
-    descripcionController.dispose();
-    minutosController.dispose();
-    super.dispose();
-  }
-
-  Future<void> guardarHabit() async {
-    if (user == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No hay usuario logueado')),
-      );
-      return;
-    }
-
-    if (!_formKey.currentState!.validate()) return;
-
-    final nombre = nombreController.text.trim();
-    final descripcion = descripcionController.text.trim();
-    final minutos = int.tryParse(minutosController.text.trim()) ?? 0;
-
-    try {
-      if (widget.habitExistente == null) {
-        // Crear
-        final habit = HabitModel(
-          id: '', // Firestore generara el id
-          nombre: nombre,
-          descripcion: descripcion,
-          minutosPorDia: minutos,
-        );
-        await habitsService.crearHabit(user!.uid, habit);
-      } else {
-        // Editar
-        final habitEditado = HabitModel(
-          id: widget.habitExistente!.id,
-          nombre: nombre,
-          descripcion: descripcion,
-          minutosPorDia: minutos,
-        );
-        await habitsService.actualizarHabit(user!.uid, habitEditado);
-      }
-
-      Navigator.pop(context);
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error al guardar el habito')),
-      );
+    if (widget.habit != null) {
+      final h = widget.habit!;
+      nombreController.text = h.nombre;
+      descripcionController.text = h.descripcion;
+      minutosController.text = h.minutosPorDia.toString();
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final esEdicion = widget.habitExistente != null;
+    final esEdicion = widget.habit != null;
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(esEdicion ? 'Editar habito' : 'Agregar habito'),
+        title: Text(esEdicion ? 'Editar Habito' : 'Agregar Habito'),
       ),
       body: Padding(
-        padding: EdgeInsets.all(16),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            children: [
-              TextFormField(
-                controller: nombreController,
-                decoration: InputDecoration(labelText: 'Nombre'),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Ingresa un nombre';
-                  }
-                  return null;
-                },
-              ),
-              TextFormField(
-                controller: descripcionController,
-                decoration: InputDecoration(labelText: 'Descripcion'),
-              ),
-              TextFormField(
-                controller: minutosController,
-                decoration:
-                    InputDecoration(labelText: 'Minutos por dia'),
-                keyboardType: TextInputType.number,
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Ingresa los minutos por dia';
-                  }
-                  if (int.tryParse(value.trim()) == null) {
-                    return 'Debe ser un numero';
-                  }
-                  return null;
-                },
-              ),
-              SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: guardarHabit,
-                child: Text(esEdicion ? 'Guardar cambios' : 'Crear habito'),
-              ),
-            ],
-          ),
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          children: [
+            TextField(
+              controller: nombreController,
+              decoration: const InputDecoration(labelText: 'Nombre del habito'),
+            ),
+            TextField(
+              controller: descripcionController,
+              decoration: const InputDecoration(labelText: 'Descripcion'),
+            ),
+            TextField(
+              controller: minutosController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: 'Minutos por dia'),
+            ),
+            const SizedBox(height: 20),
+            cargando
+                ? const CircularProgressIndicator()
+                : ElevatedButton(
+                    onPressed: _guardarHabito,
+                    child: Text(esEdicion ? 'Guardar cambios' : 'Guardar'),
+                  ),
+          ],
         ),
       ),
     );
+  }
+
+  Future<void> _guardarHabito() async {
+    final user = auth.currentUser;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No hay usuario autenticado')),
+      );
+      return;
+    }
+
+    if (nombreController.text.trim().isEmpty ||
+        minutosController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Nombre y minutos son obligatorios')),
+      );
+      return;
+    }
+
+    final minutos = int.tryParse(minutosController.text.trim()) ?? 0;
+
+    setState(() => cargando = true);
+
+    if (widget.habit == null) {
+   
+      final nuevo = HabitModel(
+        id: '', 
+        nombre: nombreController.text.trim(),
+        descripcion: descripcionController.text.trim(),
+        minutosPorDia: minutos,
+      );
+      await habitsService.crearHabit(user.uid, nuevo);
+    } else {
+      
+      final actualizado = HabitModel(
+        id: widget.habit!.id,
+        nombre: nombreController.text.trim(),
+        descripcion: descripcionController.text.trim(),
+        minutosPorDia: minutos,
+      );
+      await habitsService.actualizarHabit(user.uid, actualizado);
+    }
+
+    setState(() => cargando = false);
+
+    if (!mounted) return;
+    Navigator.pop(context);
   }
 }

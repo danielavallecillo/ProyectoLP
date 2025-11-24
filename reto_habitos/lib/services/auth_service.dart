@@ -1,36 +1,57 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class AuthService {
-  final FirebaseFirestore db = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _db = FirebaseFirestore.instance;
 
-  Future<Map<String, dynamic>?> login(String email, String password) async {
+  User? get usuarioActual => _auth.currentUser;
+
+  Future<User?> registrar(String email, String password) async {
     try {
-      final query = await db
-          .collection('usuarios')
-          .where('email', isEqualTo: email)
-          .where('password', isEqualTo: password)
-          .limit(1)
-          .get();
 
-      if (query.docs.isEmpty) {
-        return null;
-      }
+      final cred = await _auth.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
 
-      return query.docs.first.data();
+      final user = cred.user;
+      if (user == null) return null;
+
+      await _db.collection('users').doc(user.uid).set({
+        'email': email,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
+      return user;
+    } on FirebaseAuthException catch (e) {
+
+      print('Error al registrar: ${e.code} - ${e.message}');
+      return null;
     } catch (e) {
-      print('Error en login: $e');
+      print('Error desconocido al registrar: $e');
       return null;
     }
   }
 
-  Future<void> registrar(String email, String password) async {
+  Future<User?> login(String email, String password) async {
     try {
-      await db.collection('usuarios').add({
-        'email': email,
-        'password': password,
-      });
+      final cred = await _auth.signInWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+      return cred.user;
+    } on FirebaseAuthException catch (e) {
+      print('Error al iniciar sesion: ${e.code} - ${e.message}');
+      return null;
     } catch (e) {
-      print('Error en registro: $e');
+      print('Error desconocido al iniciar sesion: $e');
+      return null;
     }
+  }
+
+  // Cerrar sesion
+  Future<void> logout() async {
+    await _auth.signOut();
   }
 }

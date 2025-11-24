@@ -39,7 +39,8 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Reto Habitos',
       debugShowCheckedModeBanner: false,
-      home: LoginScreen(),
+      initialRoute: '/login',
+     // home: LoginScreen(),
       routes: {
         '/home': (context) => HomeScreen(),
         '/login': (context) => LoginScreen(),
