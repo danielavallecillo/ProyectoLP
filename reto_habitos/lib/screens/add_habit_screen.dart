@@ -5,8 +5,7 @@ import 'package:reto_habitos/models/habit_model.dart';
 import 'package:reto_habitos/services/habits_service.dart';
 
 class AddHabitScreen extends StatefulWidget {
-
-  final HabitModel? habit;
+  final HabitModel? habit; // null = crear, no null = editar
 
   const AddHabitScreen({super.key, this.habit});
 
@@ -15,36 +14,50 @@ class AddHabitScreen extends StatefulWidget {
 }
 
 class _AddHabitScreenState extends State<AddHabitScreen> {
-  final TextEditingController nombreController = TextEditingController();
-  final TextEditingController descripcionController = TextEditingController();
-  final TextEditingController minutosController = TextEditingController();
+  final TextEditingController _nombreController = TextEditingController();
+  final TextEditingController _descripcionController = TextEditingController();
+  final TextEditingController _minutosController = TextEditingController();
 
-  final HabitsService habitsService = HabitsService();
-  final FirebaseAuth auth = FirebaseAuth.instance;
+  final HabitsService _habitsService = HabitsService();
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  bool isSaving = false;
+  bool _guardando = false;
 
   @override
   void initState() {
     super.initState();
 
+    // Si viene un hábito, rellenamos para modo editar
     if (widget.habit != null) {
-      nombreController.text = widget.habit!.nombre;
-      descripcionController.text = widget.habit!.descripcion;
-      minutosController.text = widget.habit!.minutosPorDia.toString();
+      _nombreController.text = widget.habit!.nombre;
+      _descripcionController.text = widget.habit!.descripcion;
+      _minutosController.text = widget.habit!.minutosPorDia.toString();
     }
   }
 
-  @override
-  void dispose() {
-    nombreController.dispose();
-    descripcionController.dispose();
-    minutosController.dispose();
-    super.dispose();
-  }
-
   Future<void> _guardarHabit() async {
-    final user = auth.currentUser;
+    if (_guardando) return;
+
+    final nombre = _nombreController.text.trim();
+    final descripcion = _descripcionController.text.trim();
+    final minutosStr = _minutosController.text.trim();
+
+    if (nombre.isEmpty || descripcion.isEmpty || minutosStr.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Completa todos los campos')),
+      );
+      return;
+    }
+
+    final minutos = int.tryParse(minutosStr);
+    if (minutos == null || minutos <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Minutos por día debe ser un número mayor que 0')),
+      );
+      return;
+    }
+
+    final user = _auth.currentUser;
     if (user == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('No hay usuario autenticado')),
@@ -52,58 +65,57 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
       return;
     }
 
-    final nombre = nombreController.text.trim();
-    final descripcion = descripcionController.text.trim();
-    final minutosTexto = minutosController.text.trim();
-
-    if (nombre.isEmpty || descripcion.isEmpty || minutosTexto.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Completa todos los campos')),
-      );
-      return;
-    }
-
-    final minutos = int.tryParse(minutosTexto);
-    if (minutos == null || minutos <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Ingresa un numero valido de minutos')),
-      );
-      return;
-    }
-
     setState(() {
-      isSaving = true;
+      _guardando = true;
     });
 
     try {
-
-      final habit = HabitModel(
-        id: widget.habit?.id ?? '',
-        nombre: nombre,
-        descripcion: descripcion,
-        minutosPorDia: minutos,
-      );
-
       if (widget.habit == null) {
+        // ---------- CREAR HÁBITO NUEVO ----------
+        final nuevoHabit = HabitModel(
+          id: '', // Firestore genera el id; no lo usamos aquí
+          nombre: nombre,
+          descripcion: descripcion,
+          minutosPorDia: minutos,
+        );
 
-        await habitsService.crearHabit(user.uid, habit);
+        await _habitsService.crearHabit(user.uid, nuevoHabit);
+
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Hábito creado correctamente')),
+        );
       } else {
+        // ---------- EDITAR HÁBITO EXISTENTE ----------
+        final habitActualizado = HabitModel(
+          id: widget.habit!.id, // importante para actualizar el doc correcto
+          nombre: nombre,
+          descripcion: descripcion,
+          minutosPorDia: minutos,
+        );
 
-        await habitsService.actualizarHabit(user.uid, habit);
+        await _habitsService.actualizarHabit(user.uid, habitActualizado);
+
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Hábito actualizado')),
+        );
       }
 
-      if (!mounted) return;
-
-      Navigator.pop(context);
+      if (mounted) {
+        Navigator.pop(context); // volvemos al Home
+      }
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error al guardar habito: $e')),
-      );
+      // Cualquier error de Firestore / red / etc.
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al guardar hábito: $e')),
+        );
+      }
     } finally {
       if (mounted) {
         setState(() {
-          isSaving = false;
+          _guardando = false;
         });
       }
     }
@@ -111,49 +123,36 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final esEdicion = widget.habit != null;
+    final esEditar = widget.habit != null;
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(esEdicion ? 'Editar Habito' : 'Agregar Habito'),
+        title: Text(esEditar ? 'Editar Hábito' : 'Agregar Hábito'),
       ),
-      body: Padding(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
             TextField(
-              controller: nombreController,
-              decoration: const InputDecoration(
-                labelText: 'Nombre del habito',
-              ),
+              controller: _nombreController,
+              decoration: const InputDecoration(labelText: 'Nombre del hábito'),
             ),
             TextField(
-              controller: descripcionController,
-              decoration: const InputDecoration(
-                labelText: 'Descripcion',
-              ),
+              controller: _descripcionController,
+              decoration: const InputDecoration(labelText: 'Descripción'),
             ),
             TextField(
-              controller: minutosController,
+              controller: _minutosController,
+              decoration: const InputDecoration(labelText: 'Minutos por día'),
               keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: 'Minutos por dia',
-              ),
             ),
             const SizedBox(height: 30),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: isSaving ? null : _guardarHabit,
-                child: isSaving
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Text(esEdicion ? 'Guardar cambios' : 'Guardar habito'),
-              ),
-            ),
+            _guardando
+                ? const Center(child: CircularProgressIndicator())
+                : ElevatedButton(
+                    onPressed: _guardarHabit,
+                    child: Text(esEditar ? 'Guardar cambios' : 'Guardar hábito'),
+                  ),
           ],
         ),
       ),
