@@ -2,33 +2,36 @@
 //Daniela Alejandra Vallecillo Flores - 20212020968
 //Nathaly Sujey Rodriguez Maldonado - 20212020675
 
-import 'package:flutter/material.dart';
 
-void main() {
-  runApp(const MyApp());
+import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
+
+import 'package:reto_habitos/screens/login_screen.dart';
+import 'package:reto_habitos/screens/home_screen.dart';
+import 'package:reto_habitos/screens/register_screen.dart';
+import 'package:reto_habitos/screens/add_habit_screen.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
+  runApp(MyApp());
 }
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
   @override
-  Widget build(BuildContext context){
-
+  Widget build(BuildContext context) {
     return MaterialApp(
-      
+      title: 'Reto Habitos',
       debugShowCheckedModeBanner: false,
-      title: 'App habitos',
-      home: Scaffold(
-        appBar: AppBar(
-          title: const Text('App habitos'),
-        ),
-        body: const Center(
-          child: Text(
-            'La apliacion ha sido iniciada correctamente',
-            style: TextStyle(fontSize: 20),
-          ),
-        ),
-      ),
+      home: LoginScreen(),
+      routes: {
+        '/home': (context) => HomeScreen(),
+        '/login': (context) => LoginScreen(),
+        '/register': (context) => RegisterScreen(),
+        '/addHabit': (context) => AddHabitScreen(),
+      },
     );
   }
 }
