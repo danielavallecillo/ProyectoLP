@@ -4,7 +4,6 @@ import 'package:reto_habitos/models/habit_model.dart';
 class HabitsService {
   final FirebaseFirestore db = FirebaseFirestore.instance;
 
-  // Obtener habitos de un usuario
   Stream<List<HabitModel>> obtenerHabitos(String userId) {
     return db
         .collection('users')
