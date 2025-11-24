@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "114059348590",
+    "project_id": "proyectolp-reto-habitos",
+    "storage_bucket": "proyectolp-reto-habitos.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:114059348590:android:625af24826f9d70614b47f",
+        "android_client_info": {
+          "package_name": "com.example.reto_habitos"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD9UxURRt8J7EdQFxWovFWeffjIZHnQAPo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
