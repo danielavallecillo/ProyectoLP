@@ -1,57 +1,43 @@
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 
 class AuthService {
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-  final FirebaseFirestore _db = FirebaseFirestore.instance;
-
-  User? get usuarioActual => _auth.currentUser;
-
-  Future<User?> registrar(String email, String password) async {
-    try {
-
-      final cred = await _auth.createUserWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
-
-      final user = cred.user;
-      if (user == null) return null;
-
-      await _db.collection('users').doc(user.uid).set({
-        'email': email,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
-
-      return user;
-    } on FirebaseAuthException catch (e) {
-
-      print('Error al registrar: ${e.code} - ${e.message}');
-      return null;
-    } catch (e) {
-      print('Error desconocido al registrar: $e');
-      return null;
-    }
-  }
+  final FirebaseAuth auth = FirebaseAuth.instance;
 
   Future<User?> login(String email, String password) async {
     try {
-      final cred = await _auth.signInWithEmailAndPassword(
+      final result = await auth.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
-      return cred.user;
+      return result.user;
     } on FirebaseAuthException catch (e) {
-      print('Error al iniciar sesion: ${e.code} - ${e.message}');
+      print('Error en login: ${e.code} - ${e.message}');
       return null;
     } catch (e) {
-      print('Error desconocido al iniciar sesion: $e');
+      print('Error desconocido en login: $e');
       return null;
     }
   }
 
-  // Cerrar sesion
-  Future<void> logout() async {
-    await _auth.signOut();
+  Future<User?> registrar(String email, String password) async {
+    try {
+      final result = await auth.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+      return result.user;
+    } on FirebaseAuthException catch (e) {
+      print('Error en registrar: ${e.code} - ${e.message}');
+      return null;
+    } catch (e) {
+      print('Error desconocido en registrar: $e');
+      return null;
+    }
   }
+
+  Future<void> logout() async {
+    await auth.signOut();
+  }
+
+  User? get usuarioActual => auth.currentUser;
 }
